@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+    PROJECTNAME-CHANGEME:
+        build:
+          context: .
+        volumes:
+            - .:/project
+            - ~/.aws:/home/rstudio/.aws
+        ports:
+            - 8787:8787
+        environment:
+            - PASSWORD=warbyparker
