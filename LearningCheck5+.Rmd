@@ -1,0 +1,116 @@
+---
+title: "Modern Dive Problems"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(moderndive)
+library(skimr)
+library(gapminder)
+```
+
+```{r}
+evals_ch5 <- evals %>%
+  select(ID, score, bty_avg, age)
+```
+
+```{r}
+glimpse(evals_ch5)
+```
+
+```{r}
+evals_ch5 %>%
+  sample_n(size = 5)
+```
+
+```{r}
+evals_ch5 %>%
+  summarize(mean_bty_avg = mean(bty_avg), mean_score = mean(score),
+            median_bty_avg = median(bty_avg), median_score = median(score))
+```
+
+```{r}
+evals_ch5 %>% select(score, bty_avg) %>% skim()
+```
+
+```{r}
+evals_ch5 %>% 
+  get_correlation(formula = score ~ bty_avg)
+```
+
+```{r}
+evals_ch5 %>% 
+  summarize(correlation = cor(score, bty_avg))
+```
+
+```{r}
+ggplot(evals_ch5, aes(x = bty_avg, y = score)) +
+  geom_point() +
+  labs(x = "Beauty Score", 
+       y = "Teaching Score",
+       title = "Scatterplot of relationship of teaching and beauty scores")
+```
+
+```{r}
+ggplot(evals_ch5, aes(x = bty_avg, y = score)) +
+  geom_jitter() +
+  labs(x = "Beauty Score", y = "Teaching Score",
+       title = "Scatterplot of relationship of teaching and beauty scores")
+```
+
+```{r}
+ggplot(evals_ch5, aes(x = bty_avg, y = score)) +
+  geom_point() +
+  labs(x = "Beauty Score", y = "Teaching Score",
+       title = "Relationship between teaching and beauty scores") +  
+  geom_smooth(method = "lm", se = FALSE)
+```
+Learning Check 5.1
+B- Summary Statistics
+```{r}
+evals_ch5 %>%
+  summarize(mean_age = mean(age), mean_score = mean(score),
+            median_age = median(age), median_score = median(score))
+```
+
+```{r}
+evals_ch5 %>% select(score, age) %>% skim()
+```
+
+
+```{r}
+evals_ch5 %>% 
+  get_correlation(formula = score ~ age)
+```
+
+
+
+C- Make the graph
+```{r}
+ggplot(evals_ch5, aes(x = age, y = score)) +
+  geom_point() +
+  labs(x = "Age", y = "Teaching Score",
+       title = "Relationship between age and teaching score") +  
+  geom_smooth(method = "lm", se = FALSE)
+```
+Age and teaching score are slightly negatively correlated.
+
+```{r}
+# Fit regression model:
+score_model <- lm(score ~ bty_avg, data = evals_ch5)
+# Get regression table:
+get_regression_table(score_model)
+```
+
+```{r}
+# Fit regression model:
+score_model <- lm(score ~ bty_avg, data = evals_ch5)
+# Get regression table:
+get_regression_table(score_model)
+```
+
