@@ -106,11 +106,22 @@ score_model <- lm(score ~ bty_avg, data = evals_ch5)
 # Get regression table:
 get_regression_table(score_model)
 ```
-
+Learning Check 5.2 Change this to score and age
 ```{r}
 # Fit regression model:
-score_model <- lm(score ~ bty_avg, data = evals_ch5)
+score_age_model <- lm(score ~ age, data = evals_ch5)
 # Get regression table:
-get_regression_table(score_model)
+get_regression_table(score_age_model)
+```
+
+```{r}
+regression_points <- get_regression_points(score_model)
+regression_points
+```
+
+Learning Check 5.3 Generate a data frame of the residuals of the model where you used age as the explanatory variable 
+```{r}
+regression_points <- get_regression_points(score_age_model)
+regression_points
 ```
 
