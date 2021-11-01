@@ -12,8 +12,14 @@ library(tidyverse)
 library(moderndive)
 library(skimr)
 library(gapminder)
+library(ISLR)
+library(infer)
+library(nycflights13)
+library(ggplot2movies)
+library(fivethirtyeight)
 ```
 
+#Chapter 5 - Basic Regression
 ```{r}
 evals_ch5 <- evals %>%
   select(ID, score, bty_avg, age)
@@ -123,5 +129,1230 @@ Learning Check 5.3 Generate a data frame of the residuals of the model where you
 ```{r}
 regression_points <- get_regression_points(score_age_model)
 regression_points
+```
+
+```{r}
+gapminder2007 <- gapminder %>%
+  filter(year == 2007) %>%
+  select(country, lifeExp, continent, gdpPercap)
+```
+
+```{r}
+glimpse(gapminder2007)
+```
+
+```{r}
+gapminder2007 %>% sample_n(size = 5)
+```
+
+```{r}
+gapminder2007 %>%
+  select(lifeExp, continent) %>%
+  skim()
+```
+
+```{r}
+ggplot(gapminder2007, aes(x = lifeExp)) +
+  geom_histogram(binwidth = 5, color = "white") +
+  labs(x = "Life expectancy", y = "Number of countries",
+       title = "Histogram of distribution of worldwide life expectancies")
+```
+
+```{r}
+ggplot(gapminder2007, aes(x = lifeExp)) +
+  geom_histogram(binwidth = 5, color = "white") +
+  labs(x = "Life expectancy", 
+       y = "Number of countries",
+       title = "Histogram of distribution of worldwide life expectancies") +
+  facet_wrap(~ continent, nrow = 2)
+```
+
+```{r}
+ggplot(gapminder2007, aes(x = continent, y = lifeExp)) +
+  geom_boxplot() +
+  labs(x = "Continent", y = "Life expectancy",
+       title = "Life expectancy by continent")
+```
+
+```{r}
+lifeExp_by_continent <- gapminder2007 %>%
+  group_by(continent) %>%
+  summarize(median = median(lifeExp), 
+            mean = mean(lifeExp))
+```
+
+Learning Check 5.4: Conduct a new exploratory data analysis with the same explanatory variable x being continent but with gdp Percap as the new outcome variable y. What can you say about the differences in GDP per capita between continents based on this exploration? 
+
+```{r}
+ggplot(gapminder2007, aes(x = gdpPercap)) +
+  geom_histogram(binwidth = 300, color = "white") +
+  labs(x = "GDP Per Capita", y = "Number of countries",
+       title = "Histogram of distribution of worldwide GDP Per Capita")
+```
+I don't really understand why the bin with has to be SO SO SO much bigger for GDP than life expectancy. Like I understand that Life Expectancy has lower variation but I'm not sure how that translates to the graph. 
+
+```{r}
+ggplot(gapminder2007, aes(x = gdpPercap)) +
+  geom_histogram(binwidth = 1500, color = "white") +
+  labs(x = "GDP Per Capita", 
+       y = "Number of countries",
+       title = "Histogram of distribution of worldwide GDP Per Capita") +
+  facet_wrap(~ continent, nrow = 2)
+```
+
+```{r}
+ggplot(gapminder2007, aes(x = continent, y = gdpPercap)) +
+  geom_boxplot() +
+  labs(x = "Continent", y = "GDP Per Capita",
+       title = "GDP Per Capita by continent")
+```
+##5.2.2
+
+```{r}
+lifeExp_model <- lm(lifeExp ~ continent, data = gapminder2007)
+get_regression_table(lifeExp_model)
+```
+
+
+Learning Check 5.5 Fit a new linear regression using lm(gdpPercap ~ continent, data = gapminder2007) where gdpPercap is the new outcome variable y. Get information about the "best-fitting" line from the regression table by applying the get_regression_table function. How do the regression results match up with the results from your previous EDA?
+
+```{r}
+# Fit regression model:
+gdp_model <- lm(gdpPercap ~ continent, data = gapminder2007)
+# Get regression table:
+get_regression_table(gdp_model)
+```
+##5.2.3
+```{r}
+regression_points <- get_regression_points(lifeExp_model, ID = "country")
+regression_points
+```
+Learning Check 5.6
+Using either the sorting functionality of RStudio's spreadsheet viewer or using the data wrangling tools you learned in chapter 3, identify the five countries with the five smallest (most negative) residuals?
+What do these negative resituals say about their life expectancy relative to their continents' life expectancy?
+
+It says that the life expectancy is lower than others on their continent. 
+
+```{r}
+regression_points %>%
+  arrange(residual)
+```
+
+Learning Check 5.7
+Repeat this process but identify the five countries with the five largest (most positive) residuals. What do these positive residuals say about their ife expectancy relative to their continents' life expectancy?
+
+It says that the life expectancy is higher than others on their continent.
+
+```{r}
+regression_points %>%
+  arrange(desc(residual))
+```
+##5.3
+```{r}
+# Fit regression model:
+score_model <- lm(score ~ bty_avg, 
+                  data = evals_ch5)
+
+# Get regression points:
+regression_points <- get_regression_points(score_model)
+regression_points
+```
+
+```{r}
+# Compute sum of squared residuals
+regression_points %>%
+  mutate(squared_residuals = residual^2) %>%
+  summarize(sum_of_squared_residuals = sum(squared_residuals))
+```
+
+##5.3.3
+
+```{r}
+# Fit regression model:
+score_model <- lm(formula = score ~ bty_avg, data = evals_ch5)
+# Get regression table:
+get_regression_table(score_model)
+```
+
+
+```{r}
+library(broom)
+library(janitor)
+score_model %>%
+  tidy(conf.int = TRUE) %>%
+  mutate_if(is.numeric, round, digits = 3) %>%
+  clean_names() %>%
+  rename(lower_ci = conf_low, upper_ci = conf_high)
+```
+
+```{r}
+library(broom)
+library(janitor)
+score_model %>%
+  augment() %>%
+  mutate_if(is.numeric, round, digits = 3) %>%
+  clean_names() %>%
+  select(-c("std_resid", "hat", "sigma", "cooksd", "std_resid"))
+```
+
+#Chapter 6 - Multiple Regression
+##6.1.1
+```{r}
+evals_ch6 <- evals %>%
+  select(ID, score, age, gender)
+```
+
+```{r}
+glimpse(evals_ch6)
+```
+
+```{r}
+evals_ch6 %>% sample_n(size = 5)
+```
+
+```{r}
+evals_ch6 %>% select(score, age, gender) %>% skim()
+```
+
+```{r}
+evals_ch6 %>% 
+  get_correlation(formula = score ~ age)
+```
+
+```{r}
+ggplot(evals_ch6, aes(x = age, y = score, color = gender)) +
+  geom_point() +
+  labs(x = "Age", y = "Teaching Score", color = "Gender") +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+##6.1.2
+```{r}
+# Fit regression model:
+score_model_interaction <- lm(score ~ age * gender, data = evals_ch6)
+
+# Get regression table:
+get_regression_table(score_model_interaction)
+```
+
+##6.1.3
+```{r}
+ggplot(evals_ch6, aes(x = age, y = score, color = gender)) +
+  geom_point() +
+  labs(x = "Age", y = "Teaching Score", color = "Gender") +
+  geom_parallel_slopes(se = FALSE)
+```
+
+```{r}
+# Fit regression model:
+score_model_parallel_slopes <- lm(score ~ age + gender, data = evals_ch6)
+# Get regression table:
+get_regression_table(score_model_parallel_slopes)
+```
+##6.1.4
+```{r}
+regression_points <- get_regression_points(score_model_interaction)
+regression_points
+```
+
+Learning Check 6.1
+Compute the observed values, fitted values and residuals not for the interaction model as we just did, but rather for the parallel slopes model we saved in score_model_parallel_slopes. 
+
+```{r}
+regression_points <- get_regression_points(score_model_parallel_slopes)
+regression_points
+```
+
+6.2.1
+```{r}
+library(ISLR)
+credit_ch6 <- Credit %>% as_tibble() %>% 
+  select(ID, debt = Balance, credit_limit = Limit, 
+         income = Income, credit_rating = Rating, age = Age)
+```
+
+```{r}
+glimpse(credit_ch6)
+```
+
+```{r}
+credit_ch6 %>% sample_n(size = 5)
+```
+
+```{r}
+credit_ch6 %>% select(debt, credit_limit, income) %>% skim()
+```
+
+```{r}
+credit_ch6 %>% get_correlation(debt ~ credit_limit)
+
+```
+
+```{r}
+credit_ch6 %>% get_correlation(debt ~ income)
+```
+
+```{r}
+credit_ch6 %>% 
+  select(debt, credit_limit, income) %>% 
+  cor()
+```
+
+```{r}
+ggplot(credit_ch6, aes(x = credit_limit, y = debt)) +
+  geom_point() +
+  labs(x = "Credit limit (in $)", y = "Credit card debt (in $)", 
+       title = "Debt and credit limit") +
+  geom_smooth(method = "lm", se = FALSE)
+
+ggplot(credit_ch6, aes(x = income, y = debt)) +
+  geom_point() +
+  labs(x = "Income (in $1000)", y = "Credit card debt (in $)", 
+       title = "Debt and income") +
+  geom_smooth(method = "lm", se = FALSE)
+```
+Learning Check 6.2
+Conduct a new exploratory data analysis with the same outcome variable y, debt, but with the credit_rating and age as the new exploratory variables x1 and x2. What can you say about the relationship between a credit card holder's debt and their credit rating and age?
+
+```{r}
+credit_ch6 %>% select(debt, credit_rating, age) %>% skim()
+```
+
+```{r}
+credit_ch6 %>% get_correlation(debt ~ credit_rating)
+credit_ch6 %>% get_correlation(debt ~ age)
+```
+
+```{r}
+credit_ch6 %>% 
+  select(debt, credit_rating, age) %>% 
+  cor()
+```
+
+```{r}
+ggplot(credit_ch6, aes(x = credit_rating, y = debt)) +
+  geom_point() +
+  labs(x = "Credit Rating", y = "Credit card debt (in $)", 
+       title = "Debt and Credit Rating") +
+  geom_smooth(method = "lm", se = FALSE)
+
+ggplot(credit_ch6, aes(x = age, y = debt)) +
+  geom_point() +
+  labs(x = "Age", y = "Credit card debt (in $)", 
+       title = "Debt and Age") +
+  geom_smooth(method = "lm", se = FALSE)
+```
+6.2.2 Regression Plane
+```{r}
+# Fit regression model:
+debt_model <- lm(debt ~ credit_limit + income, data = credit_ch6)
+# Get regression table:
+get_regression_table(debt_model)
+```
+Learning Check 6.3
+Fit a new simple linear regression using lm(debt ~credit_rating + age, data = credit_ch6) where credit_rating and age are the new numerical explanatory variables x1 and x2. Get information about the "best-fitting" regression plane from the regression table by applying the get_regression_table() function. How do the regression results match up with the results from your previous EDA. 
+
+```{r}
+# Fit regression model:
+debt_model_new <- lm(debt ~ credit_rating + age, data = credit_ch6)
+# Get regression table:
+get_regression_table(debt_model_new)
+```
+
+```{r}
+ggplot(credit_ch6, aes(x = age, y = credit_rating)) +
+  geom_point() +
+  labs(x = "Age", y = "Credit Rating", 
+       title = "Age and Credit Rating") +
+  geom_smooth(method = "lm", se = FALSE)
+
+```
+
+
+6.3.1
+Interaction Model
+```{r}
+ # Interaction model
+ggplot(MA_schools, 
+       aes(x = perc_disadvan, y = average_sat_math, color = size)) +
+  geom_point(alpha = 0.25) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Percent economically disadvantaged", y = "Math SAT Score", 
+       color = "School size", title = "Interaction model")
+```
+
+```{r}
+# Parallel slopes model
+ggplot(MA_schools, 
+       aes(x = perc_disadvan, y = average_sat_math, color = size)) +
+  geom_point(alpha = 0.25) +
+  geom_parallel_slopes(se = FALSE) +
+  labs(x = "Percent economically disadvantaged", y = "Math SAT Score", 
+       color = "School size", title = "Parallel slopes model")
+```
+
+```{r}
+model_2_interaction <- lm(average_sat_math ~ perc_disadvan * size, 
+                          data = MA_schools)
+get_regression_table(model_2_interaction)
+```
+
+```{r}
+model_2_parallel_slopes <- lm(average_sat_math ~ perc_disadvan + size, 
+                              data = MA_schools)
+get_regression_table(model_2_parallel_slopes)
+```
+
+```{r}
+get_regression_points(model_2_interaction) 
+```
+
+#Chapter 7 - Sampling
+## 7.1.3
+```{r}
+ggplot(tactile_prop_red, aes(x = prop_red)) +
+  geom_histogram(binwidth = 0.05, boundary = 0.4, color = "white") +
+  labs(x = "Proportion of 50 balls that were red", 
+       title = "Distribution of 33 proportions red") 
+```
+##7.2.1
+```{r}
+# Segment 1: sample size = 25 ------------------------------
+# 1.a) Virtually use shovel 1000 times
+virtual_samples_25 <- bowl %>% 
+  rep_sample_n(size = 25, reps = 1000)
+
+# 1.b) Compute resulting 1000 replicates of proportion red
+virtual_prop_red_25 <- virtual_samples_25 %>% 
+  group_by(replicate) %>% 
+  summarize(red = sum(color == "red")) %>% 
+  mutate(prop_red = red / 25)
+
+# 1.c) Plot distribution via a histogram
+ggplot(virtual_prop_red_25, aes(x = prop_red)) +
+  geom_histogram(binwidth = 0.05, boundary = 0.4, color = "white") +
+  labs(x = "Proportion of 25 balls that were red", title = "25") 
+
+
+# Segment 2: sample size = 50 ------------------------------
+# 2.a) Virtually use shovel 1000 times
+virtual_samples_50 <- bowl %>% 
+  rep_sample_n(size = 50, reps = 1000)
+
+# 2.b) Compute resulting 1000 replicates of proportion red
+virtual_prop_red_50 <- virtual_samples_50 %>% 
+  group_by(replicate) %>% 
+  summarize(red = sum(color == "red")) %>% 
+  mutate(prop_red = red / 50)
+
+# 2.c) Plot distribution via a histogram
+ggplot(virtual_prop_red_50, aes(x = prop_red)) +
+  geom_histogram(binwidth = 0.05, boundary = 0.4, color = "white") +
+  labs(x = "Proportion of 50 balls that were red", title = "50")  
+
+
+# Segment 3: sample size = 100 ------------------------------
+# 3.a) Virtually using shovel with 100 slots 1000 times
+virtual_samples_100 <- bowl %>% 
+  rep_sample_n(size = 100, reps = 1000)
+
+# 3.b) Compute resulting 1000 replicates of proportion red
+virtual_prop_red_100 <- virtual_samples_100 %>% 
+  group_by(replicate) %>% 
+  summarize(red = sum(color == "red")) %>% 
+  mutate(prop_red = red / 100)
+
+# 3.c) Plot distribution via a histogram
+ggplot(virtual_prop_red_100, aes(x = prop_red)) +
+  geom_histogram(binwidth = 0.05, boundary = 0.4, color = "white") +
+  labs(x = "Proportion of 100 balls that were red", title = "100") 
+```
+
+```{r}
+# n = 25
+virtual_prop_red_25 %>% 
+  summarize(sd = sd(prop_red))
+
+# n = 50
+virtual_prop_red_50 %>% 
+  summarize(sd = sd(prop_red))
+
+# n = 100
+virtual_prop_red_100 %>% 
+  summarize(sd = sd(prop_red))
+```
+#Chapter 8 - Bootstrapping and Confidence Intervals
+```{r}
+ggplot(pennies_sample, aes(x = year)) +
+  geom_histogram(binwidth = 10, color = "white")
+```
+
+```{r}
+x_bar <- pennies_sample %>% 
+  summarize(mean_year = mean(year))
+x_bar
+```
+
+```{r}
+pennies_resample <- tibble(
+  year = c(1976, 1962, 1976, 1983, 2017, 2015, 2015, 1962, 2016, 1976, 
+           2006, 1997, 1988, 2015, 2015, 1988, 2016, 1978, 1979, 1997, 
+           1974, 2013, 1978, 2015, 2008, 1982, 1986, 1979, 1981, 2004, 
+           2000, 1995, 1999, 2006, 1979, 2015, 1979, 1998, 1981, 2015, 
+           2000, 1999, 1988, 2017, 1992, 1997, 1990, 1988, 2006, 2000)
+)
+```
+
+
+```{r}
+ggplot(pennies_resample, aes(x = year)) +
+  geom_histogram(binwidth = 10, color = "white") +
+  labs(title = "Resample of 50 pennies")
+ggplot(pennies_sample, aes(x = year)) +
+  geom_histogram(binwidth = 10, color = "white") +
+  labs(title = "Original sample of 50 pennies")
+```
+
+```{r}
+pennies_resample %>% 
+  summarize(mean_year = mean(year))
+```
+
+```{r}
+resampled_means <- pennies_resamples %>% 
+  group_by(name) %>% 
+  summarize(mean_year = mean(year))
+resampled_means
+```
+
+```{r}
+ggplot(resampled_means, aes(x = mean_year)) +
+  geom_histogram(binwidth = 1, color = "white", boundary = 1990) +
+  labs(x = "Sampled mean year")
+```
+
+##8.2.1
+
+```{r}
+virtual_shovel <- bowl %>% 
+  rep_sample_n(size = 50)
+```
+
+```{r}
+virtual_resample <- pennies_sample %>% 
+  rep_sample_n(size = 50, replace = TRUE)
+```
+
+```{r}
+virtual_resample %>% 
+  summarize(resample_mean = mean(year))
+```
+##8.2.2
+```{r}
+virtual_resamples <- pennies_sample %>% 
+  rep_sample_n(size = 50, replace = TRUE, reps = 35)
+virtual_resamples
+```
+
+```{r}
+virtual_resampled_means <- virtual_resamples %>% 
+  group_by(replicate) %>% 
+  summarize(mean_year = mean(year))
+virtual_resampled_means
+```
+
+```{r}
+ggplot(virtual_resampled_means, aes(x = mean_year)) +
+  geom_histogram(binwidth = 1, color = "white", boundary = 1990) +
+  labs(x = "Resample mean year")
+```
+
+##8.2.3
+```{r}
+# Repeat resampling 1000 times
+virtual_resamples <- pennies_sample %>% 
+  rep_sample_n(size = 50, replace = TRUE, reps = 1000)
+
+# Compute 1000 sample means
+virtual_resampled_means <- virtual_resamples %>% 
+  group_by(replicate) %>% 
+  summarize(mean_year = mean(year))
+```
+
+```{r}
+virtual_resampled_means <- pennies_sample %>% 
+  rep_sample_n(size = 50, replace = TRUE, reps = 1000) %>% 
+  group_by(replicate) %>% 
+  summarize(mean_year = mean(year))
+virtual_resampled_means
+```
+
+```{r}
+ggplot(virtual_resampled_means, aes(x = mean_year)) +
+  geom_histogram(binwidth = 1, color = "white", boundary = 1990) +
+  labs(x = "sample mean")
+```
+
+```{r}
+virtual_resampled_means %>% 
+  summarize(mean_of_means = mean(mean_year))
+```
+##Learning Check 8.1 and 8.2 (writtien in book)
+##8.3.2
+```{r}
+virtual_resampled_means %>% 
+  summarize(SE = sd(mean_year))
+```
+
+8.4.1
+```{r}
+pennies_sample %>% 
+  rep_sample_n(size = 50, replace = TRUE, reps = 1000)
+```
+
+```{r}
+pennies_sample %>% 
+  rep_sample_n(size = 50, replace = TRUE, reps = 1000) %>% 
+  group_by(replicate) 
+```
+
+```{r}
+pennies_sample %>% 
+  rep_sample_n(size = 50, replace = TRUE, reps = 1000) %>% 
+  group_by(replicate) %>% 
+  summarize(mean_year = mean(year))
+```
+
+##8.4.2
+```{r}
+pennies_sample %>% 
+  summarize(stat = mean(year))
+```
+
+```{r}
+pennies_sample %>% 
+  specify(response = year)
+```
+
+```{r}
+pennies_sample %>% 
+  specify(formula = year ~ NULL)
+```
+
+```{r}
+pennies_sample %>% 
+  specify(response = year) %>% 
+  generate(reps = 1000, type = "bootstrap")
+```
+
+```{r}
+bootstrap_distribution <- pennies_sample %>% 
+  specify(response = year) %>% 
+  generate(reps = 1000) %>% 
+  calculate(stat = "mean")
+bootstrap_distribution
+```
+
+```{r}
+visualize(bootstrap_distribution)
+```
+
+
+##8.4.3
+```{r}
+percentile_ci <- bootstrap_distribution %>% 
+  get_confidence_interval(level = 0.95, type = "percentile")
+percentile_ci
+```
+
+```{r}
+visualize(bootstrap_distribution) + 
+  shade_confidence_interval(endpoints = percentile_ci)
+```
+
+```{r}
+visualize(bootstrap_distribution) + 
+  shade_ci(endpoints = percentile_ci, color = "hotpink", fill = "khaki")
+```
+
+
+##8.4.4
+```{r}
+standard_error_ci <- bootstrap_distribution %>% 
+  get_confidence_interval(type = "se", point_estimate = x_bar)
+```
+
+```{r}
+visualize(bootstrap_distribution) + 
+  shade_confidence_interval(endpoints = standard_error_ci)
+```
+
+
+##Learning Check 8.5
+```{r}
+bootstrap_distribution_median <- pennies_sample %>% 
+  specify(response = year) %>% 
+  generate(reps = 1000) %>% 
+  calculate(stat = "median")
+bootstrap_distribution_median
+```
+
+```{r}
+percentile_ci_median <- bootstrap_distribution_median %>% 
+  get_confidence_interval(level = 0.95, type = "percentile")
+percentile_ci_median
+```
+
+```{r}
+visualize(bootstrap_distribution_median) + 
+  shade_confidence_interval(endpoints = percentile_ci)
+```
+
+## Is this normal enough to use standard error? I don't think so?
+```{r}
+visualize(bootstrap_distribution_median) + 
+  shade_confidence_interval(endpoints = standard_error_ci)
+```
+
+##8.5
+```{r}
+bowl %>% 
+  summarize(p_red = mean(color == "red"))
+```
+
+```{r}
+bowl %>% 
+  summarize(p_red = mean(color == "red"))
+```
+
+
+
+```{r}
+bowl_sample_1 %>% 
+  specify(response = color, success = "red") %>% 
+  generate(reps = 1000, type = "bootstrap")
+```
+
+```{r}
+sample_1_bootstrap <- bowl_sample_1 %>% 
+  specify(response = color, success = "red") %>% 
+  generate(reps = 1000, type = "bootstrap") %>% 
+  calculate(stat = "prop")
+sample_1_bootstrap
+```
+
+```{r}
+percentile_ci_1 <- sample_1_bootstrap %>% 
+  get_confidence_interval(level = 0.95, type = "percentile")
+percentile_ci_1
+```
+
+```{r}
+sample_1_bootstrap %>% 
+  visualize(bins = 15) + 
+  shade_confidence_interval(endpoints = percentile_ci_1) +
+  geom_vline(xintercept = 0.42, linetype = "dashed")
+```
+
+```{r}
+bowl_sample_2 <- bowl %>% rep_sample_n(size = 50)
+bowl_sample_2
+```
+
+```{r}
+sample_2_bootstrap <- bowl_sample_2 %>% 
+  specify(response = color, 
+          success = "red") %>% 
+  generate(reps = 1000, 
+           type = "bootstrap") %>% 
+  calculate(stat = "prop")
+sample_2_bootstrap
+```
+
+```{r}
+percentile_ci_2 <- sample_2_bootstrap %>% 
+  get_confidence_interval(level = 0.95, type = "percentile")
+percentile_ci_2
+```
+
+```{r}
+mythbusters_yawn
+```
+```{r}
+mythbusters_yawn %>% 
+  group_by(group, yawn) %>% 
+  summarize(count = n())
+```
+
+```{r}
+mythbusters_yawn %>% 
+  specify(formula = yawn ~ group, success = "yes")
+```
+
+```{r}
+first_six_rows <- head(mythbusters_yawn)
+first_six_rows
+```
+
+```{r}
+first_six_rows %>% 
+  sample_n(size = 6, replace = TRUE)
+```
+
+```{r}
+mythbusters_yawn %>% 
+  specify(formula = yawn ~ group, success = "yes") %>% 
+  generate(reps = 1000, type = "bootstrap")
+```
+
+```{r}
+mythbusters_yawn %>% 
+  specify(formula = yawn ~ group, success = "yes") %>% 
+  generate(reps = 1000, type = "bootstrap") %>% 
+  calculate(stat = "diff in props")
+```
+
+```{r}
+bootstrap_distribution_yawning <- mythbusters_yawn %>% 
+  specify(formula = yawn ~ group, success = "yes") %>% 
+  generate(reps = 1000, type = "bootstrap") %>% 
+  calculate(stat = "diff in props", order = c("seed", "control"))
+bootstrap_distribution_yawning
+```
+
+
+```{r}
+visualize(bootstrap_distribution_yawning) +
+  geom_vline(xintercept = 0)
+```
+
+```{r}
+bootstrap_distribution_yawning %>% 
+  get_confidence_interval(type = "percentile", level = 0.95)
+```
+
+```{r}
+obs_diff_in_props <- mythbusters_yawn %>% 
+  specify(formula = yawn ~ group, success = "yes") %>% 
+  # generate(reps = 1000, type = "bootstrap") %>% 
+  calculate(stat = "diff in props", order = c("seed", "control"))
+obs_diff_in_props
+```
+
+#Chapter 9 - Hypothesis Testing
+
+```{r}
+promotions %>% 
+  sample_n(size = 6) %>% 
+  arrange(id)
+```
+
+```{r}
+ggplot(promotions, aes(x = gender, fill = decision)) +
+  geom_bar() +
+  labs(x = "Gender of name on résumé")
+```
+
+```{r}
+promotions %>% 
+  group_by(gender, decision) %>% 
+  tally()
+```
+
+```{r}
+ggplot(promotions_shuffled, 
+       aes(x = gender, fill = decision)) +
+  geom_bar() + 
+  labs(x = "Gender of résumé name")
+```
+
+```{r}
+promotions_shuffled %>% 
+  group_by(gender, decision) %>% 
+  tally() # Same as summarize(n = n())
+```
+
+```{r}
+promotions %>% 
+  specify(formula = decision ~ gender, success = "promoted") 
+```
+
+```{r}
+promotions %>% 
+  specify(formula = decision ~ gender, success = "promoted") %>% 
+  hypothesize(null = "independence")
+```
+
+```{r}
+promotions_generate <- promotions %>% 
+  specify(formula = decision ~ gender, success = "promoted") %>% 
+  hypothesize(null = "independence") %>% 
+  generate(reps = 1000, type = "permute")
+nrow(promotions_generate)
+```
+
+```{r}
+null_distribution <- promotions %>% 
+  specify(formula = decision ~ gender, success = "promoted") %>% 
+  hypothesize(null = "independence") %>% 
+  generate(reps = 1000, type = "permute") %>% 
+  calculate(stat = "diff in props", order = c("male", "female"))
+null_distribution
+```
+
+```{r}
+obs_diff_prop <- promotions %>% 
+  specify(decision ~ gender, success = "promoted") %>% 
+  calculate(stat = "diff in props", order = c("male", "female"))
+obs_diff_prop
+```
+
+```{r}
+visualize(null_distribution, bins = 10)
+```
+
+```{r}
+visualize(null_distribution, bins = 10) + 
+  shade_p_value(obs_stat = obs_diff_prop, direction = "right")
+```
+
+```{r}
+null_distribution %>% 
+  get_p_value(obs_stat = obs_diff_prop, direction = "right")
+```
+
+##9.3.2 Comparison with confidence intervals
+
+```{r}
+null_distribution <- promotions %>% 
+  specify(formula = decision ~ gender, success = "promoted") %>% 
+  hypothesize(null = "independence") %>% 
+  generate(reps = 1000, type = "permute") %>% 
+  calculate(stat = "diff in props", order = c("male", "female"))
+```
+
+```{r}
+bootstrap_distribution <- promotions %>% 
+  specify(formula = decision ~ gender, success = "promoted") %>% 
+  # Change 1 - Remove hypothesize():
+  # hypothesize(null = "independence") %>% 
+  # Change 2 - Switch type from "permute" to "bootstrap":
+  generate(reps = 1000, type = "bootstrap") %>% 
+  calculate(stat = "diff in props", order = c("male", "female"))
+```
+
+```{r}
+percentile_ci <- bootstrap_distribution %>% 
+  get_confidence_interval(level = 0.95, type = "percentile")
+percentile_ci
+```
+
+```{r}
+visualize(bootstrap_distribution) + 
+  shade_confidence_interval(endpoints = percentile_ci)
+```
+
+```{r}
+se_ci <- bootstrap_distribution %>% 
+  get_confidence_interval(level = 0.95, type = "se", 
+                          point_estimate = obs_diff_prop)
+se_ci
+```
+
+```{r}
+visualize(bootstrap_distribution) + 
+  shade_confidence_interval(endpoints = se_ci)
+```
+###Learning Check 9.1
+###Diff in means requires a numerical variable, we need diff in props which can do categorical ones
+```{r}
+library(moderndive)
+library(infer)
+null_distribution_mean <- promotions %>%
+  specify(formula = decision ~ gender, success = "promoted") %>% 
+  hypothesize(null = "independence") %>% 
+  generate(reps = 1000, type = "permute") %>% 
+  calculate(stat = "diff in means", order = c("male", "female"))
+```
+
+##9.5 Case study: Are action or romance movies rated higher
+```{r}
+ggplot(data = movies_sample, aes(x = genre, y = rating)) +
+  geom_boxplot() +
+  labs(y = "IMDb rating")
+```
+
+```{r}
+movies_sample %>% 
+  group_by(genre) %>% 
+  summarize(n = n(), mean_rating = mean(rating), std_dev = sd(rating))
+```
+
+```{r}
+movies_sample %>% 
+  specify(formula = rating ~ genre)
+```
+
+```{r}
+movies_sample %>% 
+  specify(formula = rating ~ genre) %>% 
+  hypothesize(null = "independence")
+```
+
+```{r}
+movies_sample %>% 
+  specify(formula = rating ~ genre) %>% 
+  hypothesize(null = "independence") %>% 
+  generate(reps = 1000, type = "permute") %>% 
+  View()
+```
+
+```{r}
+null_distribution_movies <- movies_sample %>% 
+  specify(formula = rating ~ genre) %>% 
+  hypothesize(null = "independence") %>% 
+  generate(reps = 1000, type = "permute") %>% 
+  calculate(stat = "diff in means", order = c("Action", "Romance"))
+null_distribution_movies
+```
+```{r}
+obs_diff_means <- movies_sample %>% 
+  specify(formula = rating ~ genre) %>% 
+  calculate(stat = "diff in means", order = c("Action", "Romance"))
+obs_diff_means
+```
+
+```{r}
+visualize(null_distribution_movies, bins = 10) + 
+  shade_p_value(obs_stat = obs_diff_means, direction = "both")
+```
+##Learning Check 9.9
+```{r}
+null_distribution_movies_med <- movies_sample %>% 
+  specify(formula = rating ~ genre) %>% 
+  hypothesize(null = "independence") %>% 
+  generate(reps = 1000, type = "permute") %>% 
+  calculate(stat = "diff in medians", order = c("Action", "Romance"))
+null_distribution_movies_med
+```
+
+```{r}
+obs_diff_med <- movies_sample %>% 
+  specify(formula = rating ~ genre) %>% 
+  calculate(stat = "diff in medians", order = c("Action", "Romance"))
+obs_diff_med
+```
+
+```{r}
+visualize(null_distribution_movies_med, bins = 10) + 
+  shade_p_value(obs_stat = obs_diff_med, direction = "both")
+```
+
+#Chapter 10 - Infrence for Regression
+
+```{r}
+evals %>% 
+  select(ID, prof_ID, score, bty_avg)
+```
+
+```{r}
+ggplot(regression_points, aes(x = residual)) +
+  geom_histogram(binwidth = 0.25, color = "white") +
+  labs(x = "Residual")
+```
+
+
+```{r}
+ggplot(regression_points, aes(x = bty_avg, y = residual)) +
+  geom_point() +
+  labs(x = "Beauty Score", y = "Residual") +
+  geom_hline(yintercept = 0, col = "blue", size = 1)
+```
+
+##Learning Check 10.1
+```{r}
+score_model <- lm(score ~ age, data = evals_ch5)
+age_regression_points <- get_regression_points(score_model)
+age_regression_points
+```
+
+```{r}
+ggplot(age_regression_points, aes(x = residual)) +
+  geom_histogram(binwidth = 0.25, color = "white") +
+  labs(x = "Residual")
+```
+
+```{r}
+ggplot(age_regression_points, aes(x = age, y = residual)) +
+  geom_point() +
+  labs(x = "Age", y = "Residual") +
+  geom_hline(yintercept = 0, col = "blue", size = 1)
+```
+
+##Learning Check 10.2
+```{r}
+bootstrap_distn_correlation <- evals_ch5 %>% 
+  specify(formula = score ~ bty_avg) %>%
+  generate(reps = 1000, type = "bootstrap") %>% 
+  calculate(stat = "correlation")
+bootstrap_distn_correlation
+```
+```{r}
+visualize(bootstrap_distn_correlation)
+```
+
+```{r}
+observed_correlation <- evals %>% 
+  specify(score ~ bty_avg) %>% 
+  calculate(stat = "correlation")
+observed_correlation
+```
+
+
+```{r}
+se_ci <- bootstrap_distn_correlation %>% 
+  get_ci(level = 0.95, type = "se", point_estimate = observed_correlation)
+se_ci
+```
+```{r}
+visualize(bootstrap_distn_correlation) + 
+  shade_confidence_interval(endpoints = percentile_ci, fill = NULL, 
+                            linetype = "solid", color = "grey90") + 
+  shade_confidence_interval(endpoints = se_ci, fill = NULL, 
+                            linetype = "dashed", color = "grey60") +
+  shade_confidence_interval(endpoints = c(0.035, 0.099), fill = NULL, 
+                            linetype = "dotted", color = "black")
+```
+
+```{r}
+null_distn_correlation <- evals %>% 
+  specify(score ~ bty_avg) %>%
+  hypothesize(null = "independence") %>% 
+  generate(reps = 1000, type = "permute") %>% 
+  calculate(stat = "correlation")
+```
+
+```{r}
+visualize(null_distn_correlation)
+```
+
+```{r}
+bootstrap_distn_slope <- evals_ch5 %>%
+  specify(formula = score ~ bty_avg) %>%
+  generate(reps = 1000, type = "bootstrap") %>%
+  calculate(stat = "correlation")
+
+if (!file.exists("rds/bootstrap_distn_slope.rds")) {
+  set.seed(76)
+  bootstrap_distn_slope <- evals %>%
+    specify(score ~ bty_avg) %>%
+    generate(reps = 1000, type = "bootstrap") %>%
+    calculate(stat = "slope")
+  saveRDS(
+    object = bootstrap_distn_slope,
+    "rds/bootstrap_distn_slope.rds"
+  )
+} else {
+  bootstrap_distn_slope <- readRDS("rds/bootstrap_distn_slope.rds")
+}
+
+observed_slope <- evals %>%
+  specify(score ~ bty_avg) %>%
+  calculate(stat = "correlation")
+observed_slope
+```
+
+#Chapter 11
+```{r}
+View(house_prices)
+glimpse(house_prices)
+```
+
+```{r}
+house_prices %>% 
+  select(price, sqft_living, condition) %>% 
+  skim()
+```
+
+```{r}
+# Histogram of house price:
+ggplot(house_prices, aes(x = price)) +
+  geom_histogram(color = "white") +
+  labs(x = "price (USD)", title = "House price")
+
+# Histogram of sqft_living:
+ggplot(house_prices, aes(x = sqft_living)) +
+  geom_histogram(color = "white") +
+  labs(x = "living space (square feet)", title = "House size")
+
+# Barplot of condition:
+ggplot(house_prices, aes(x = condition)) +
+  geom_bar() +
+  labs(x = "condition", title = "House condition")
+```
+
+```{r}
+house_prices <- house_prices %>%
+  mutate(
+    log10_price = log10(price),
+    log10_size = log10(sqft_living)
+    )
+house_prices
+```
+
+```{r}
+# Before log10 transformation:
+ggplot(house_prices, aes(x = price)) +
+  geom_histogram(color = "white") +
+  labs(x = "price (USD)", title = "House price: Before")
+
+# After log10 transformation:
+ggplot(house_prices, aes(x = log10_price)) +
+  geom_histogram(color = "white") +
+  labs(x = "log10 price (USD)", title = "House price: After")
+```
+
+```{r}
+# Plot interaction model
+ggplot(house_prices, 
+       aes(x = log10_size, y = log10_price, col = condition)) +
+  geom_point(alpha = 0.05) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(y = "log10 price", 
+       x = "log10 size", 
+       title = "House prices in Seattle")
+# Plot parallel slopes model
+ggplot(house_prices, 
+       aes(x = log10_size, y = log10_price, col = condition)) +
+  geom_point(alpha = 0.05) +
+  geom_parallel_slopes(se = FALSE) +
+  labs(y = "log10 price", 
+       x = "log10 size", 
+       title = "House prices in Seattle")
+```
+
+```{r}
+ggplot(house_prices, 
+       aes(x = log10_size, y = log10_price, col = condition)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(y = "log10 price", 
+       x = "log10 size", 
+       title = "House prices in Seattle") +
+  facet_wrap(~ condition)
+```
+
+```{r}
+# Fit regression model:
+price_interaction <- lm(log10_price ~ log10_size * condition, 
+                        data = house_prices)
+
+# Get regression table:
+get_regression_table(price_interaction)
+```
+
+## Learning Check 11.1
+```{r}
+
 ```
 
